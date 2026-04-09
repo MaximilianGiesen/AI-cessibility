@@ -48,7 +48,6 @@ async function executeStep(page: Page, step: {
             break;
     }
 
-    // Kurz warten nach jeder Interaktion — DOM-Updates, Animationen
     await page.waitForTimeout(400);
 }
 
@@ -66,6 +65,7 @@ async function runAxeOnStep(
         AAA: ["wcag2a", "wcag2aa", "wcag2aaa"],
     };
 
+    // @ts-ignore
     const results = await new AxeBuilder({ page })
         .withTags(tagMap[wcagLevel])
         .analyze();
