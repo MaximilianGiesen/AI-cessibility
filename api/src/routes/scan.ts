@@ -54,7 +54,8 @@ export async function scanRoutes(app: FastifyInstance) {
         if (!scan) return reply.status(404).send({ error: "Scan nicht gefunden" });
 
         const findings = scan.status === "done"
-            ? await db.selectFrom("findings").selectAll().where("scan_id", "=", id).execute()
+            ? (await db.selectFrom("findings").selectAll().where("scan_id", "=", id).execute())
+                .map(f => ({ ...f, wcag_tags: JSON.parse(f.wcag_tags as string) }))
             : [];
 
         return reply.send({

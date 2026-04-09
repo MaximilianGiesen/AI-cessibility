@@ -5,7 +5,11 @@ import { jiraRoutes } from "./routes/jira.js";
 
 const app = Fastify({ logger: true });
 
-await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" });
+await app.register(cors, {
+    origin: process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(",")
+        : ["http://localhost:5173", "http://localhost:5174"],
+});
 await app.register(scanRoutes);
 await app.register(jiraRoutes);
 
