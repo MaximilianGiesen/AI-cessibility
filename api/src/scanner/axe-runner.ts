@@ -14,7 +14,7 @@ export async function runAxe(url: string, wcagLevel: "A" | "AA" | "AAA"): Promis
     try {
         const context = await browser.newContext();
         const page = await context.newPage();
-        await page.goto(url, { waitUntil: "networkidle" });
+        await page.goto(url, { waitUntil: "load" });
 
         const results = await new AxeBuilder({ page })
             .withTags(WCAG_TAGS[wcagLevel])
@@ -22,15 +22,16 @@ export async function runAxe(url: string, wcagLevel: "A" | "AA" | "AAA"): Promis
 
         return results.violations.flatMap(violation =>
             violation.nodes.map(node => ({
-                id:          randomUUID(),
-                ruleId:      violation.id,
-                description: violation.description,
-                selector:    node.target.join(", "),
-                html:        node.html,
-                fixHint:     node.failureSummary ?? violation.description,
-                helpUrl:     violation.helpUrl,
-                severity:    (violation.impact ?? "minor") as Finding["severity"],
-                wcagTags:    violation.tags,
+                id:                   randomUUID(),
+                ruleId:               violation.id,
+                description:          violation.description,
+                selector:             node.target.join(", "),
+                html:                 node.html,
+                fixHint:              node.failureSummary ?? violation.description,
+                helpUrl:              violation.helpUrl,
+                severity:             (violation.impact ?? "minor") as Finding["severity"],
+                wcagTags:             violation.tags,
+                flowStepDescription:  url,
             }))
         );
     } finally {

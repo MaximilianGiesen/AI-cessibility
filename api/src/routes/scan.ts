@@ -9,9 +9,10 @@ const ScanBody = z.object({
     wcag_level:   z.enum(["A", "AA", "AAA"]).default("AA"),
     project_key:  z.string().default("ACC"),
     auto_jira:    z.boolean().default(false),
-    mode:         z.enum(["snapshot", "flow"]).default("snapshot"),
+    mode:         z.enum(["snapshot", "flow", "crawl"]).default("snapshot"),
     flow_goal:    z.string().optional(),
     screenshots:  z.boolean().default(false),
+    max_pages:    z.number().int().min(1).max(100).default(20),
 });
 
 export async function scanRoutes(app: FastifyInstance) {
@@ -21,7 +22,7 @@ export async function scanRoutes(app: FastifyInstance) {
         const body = ScanBody.safeParse(req.body);
         if (!body.success) return reply.status(400).send(body.error);
 
-        const { url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots } = body.data;
+        const { url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots, max_pages } = body.data;
         const scanId = randomUUID();
 
         await db.insertInto("scans").values({
@@ -31,6 +32,11 @@ export async function scanRoutes(app: FastifyInstance) {
             mode,
             flow_goal:  flow_goal ?? null,
             status:     "running",
+            total:      0,
+            critical:   0,
+            serious:    0,
+            moderate:   0,
+            minor:      0,
             created_at: new Date().toISOString(),
         }).execute();
 
@@ -38,7 +44,7 @@ export async function scanRoutes(app: FastifyInstance) {
         reply.status(202).send({ scan_id: scanId, status: "running" });
 
         // Fire-and-forget
-        runScanInBackground({ scanId, url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots });
+        void runScanInBackground({ scanId, url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots, max_pages });
     });
 
     // GET /scans/:id — Status + Ergebnis abfragen
@@ -106,11 +112,12 @@ async function runScanInBackground(opts: {
     wcag_level:  "A" | "AA" | "AAA";
     project_key: string;
     auto_jira:   boolean;
-    mode:        "snapshot" | "flow";
+    mode:        "snapshot" | "flow" | "crawl";
     flow_goal?:  string;
     screenshots: boolean;
+    max_pages:   number;
 }) {
-    const { scanId, url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots } = opts;
+    const { scanId, url, wcag_level, project_key, auto_jira, mode, flow_goal, screenshots, max_pages } = opts;
 
     try {
         let findings: any[];
@@ -133,6 +140,18 @@ async function runScanInBackground(opts: {
                     description:  s.description,
                     status:       s.status,
                     findingCount: s.findings.length,
+                })),
+            };
+        } else if (mode === "crawl") {
+            const { runCrawlScan } = await import("../scanner/crawler-runner.js");
+            const result = await runCrawlScan(url, wcag_level, max_pages);
+            findings = result.allFindings;
+            flowMeta = {
+                pagesScanned: result.pages.length,
+                pages: result.pages.map((p: { url: string; status: string; findings: unknown[] }) => ({
+                    url:          p.url,
+                    status:       p.status,
+                    findingCount: p.findings.length,
                 })),
             };
         } else {

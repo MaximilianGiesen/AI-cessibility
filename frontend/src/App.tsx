@@ -271,7 +271,11 @@ function FindingCard({ finding, selected, onToggle }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 500, fontSize: 13 }}>{finding.rule_id}</div>
             <div style={{ fontSize: 11, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {finding.flow_step_description ? `Schritt: ${finding.flow_step_description}` : finding.selector}
+              {finding.flow_step_description
+                ? finding.flow_step_description.startsWith("http")
+                  ? finding.flow_step_description
+                  : `Schritt: ${finding.flow_step_description}`
+                : finding.selector}
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
@@ -282,7 +286,13 @@ function FindingCard({ finding, selected, onToggle }) {
         </div>
         {expanded && (
             <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border-tertiary)" }}>
-              {finding.flow_step_description && <div style={{ marginTop: 10, fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--color-background-info)", color: "var(--color-text-info)" }}>Reproduzieren: {finding.flow_step_description}</div>}
+              {finding.flow_step_description && (
+                finding.flow_step_description.startsWith("http")
+                  ? <div style={{ marginTop: 10, fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--color-background-info)", color: "var(--color-text-info)" }}>
+                      Seite: <a href={finding.flow_step_description} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>{finding.flow_step_description}</a>
+                    </div>
+                  : <div style={{ marginTop: 10, fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--color-background-info)", color: "var(--color-text-info)" }}>Reproduzieren: {finding.flow_step_description}</div>
+              )}
               <div style={{ marginTop: 10, fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 4 }}>Betroffenes Element</div>
               <pre style={{ margin: 0, fontSize: 11, padding: "8px 10px", borderRadius: 6, background: "var(--color-background-primary)", border: "1px solid var(--color-border-tertiary)", overflowX: "auto", color: "var(--color-text-primary)", fontFamily: "var(--font-mono)" }}>{finding.html}</pre>
               <div style={{ marginTop: 10, fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 4 }}>Fix-Hinweis</div>

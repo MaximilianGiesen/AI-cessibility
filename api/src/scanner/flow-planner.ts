@@ -1,6 +1,10 @@
 // Claude analysiert die Seite und plant einen User-Flow-Test.
 // Gibt strukturierte Schritte + realistische Testdaten zurück.
 
+import Anthropic from "@anthropic-ai/sdk";
+
+const anthropic = new Anthropic();
+
 export interface FlowStep {
     description: string;          // menschenlesbar, landet im Jira-Ticket
     action:      "click" | "fill" | "select" | "navigate" | "wait";
@@ -24,15 +28,12 @@ export async function planFlow(
     pageHtml: string,             // initialer DOM für Kontext
 ): Promise<FlowPlan> {
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model:      "claude-sonnet-4-20250514",
-            max_tokens: 1000,
-            messages: [{
-                role:    "user",
-                content: `Du bist ein Accessibility-Test-Planer.
+    const msg = await anthropic.messages.create({
+        model:      "claude-opus-4-6",
+        max_tokens: 1000,
+        messages: [{
+            role:    "user",
+            content: `Du bist ein Accessibility-Test-Planer.
 Analysiere diese Webseite und plane einen User-Flow-Test.
 
 URL: ${url}
@@ -68,16 +69,10 @@ Regeln:
 - Fokus auf Formular-Interaktionen, Modale, Fehlerbehandlung, Zustandswechsel
 - Selektoren müssen valides CSS sein
 - Keine Schritte die einen Login erfordern sofern nicht explizit gefordert`,
-            }],
-        }),
+        }],
     });
 
-    if (!res.ok) {
-        throw new Error(`Claude API ${res.status}: ${await res.text()}`);
-    }
-
-    const data = await res.json();
-    const text = data.content?.find((b: any) => b.type === "text")?.text ?? "{}";
+    const text = msg.content[0].type === "text" ? msg.content[0].text : "{}";
 
     let plan: FlowPlan;
     try {

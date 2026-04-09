@@ -41,7 +41,7 @@ async function executeStep(page: Page, step: {
             await page.locator(step.selector!).first().selectOption(step.value ?? "");
             break;
         case "navigate":
-            await page.goto(step.url!, { waitUntil: "networkidle" });
+            await page.goto(step.url!, { waitUntil: "load" });
             break;
         case "wait":
             await page.waitForTimeout(step.waitMs ?? 1000);
@@ -98,10 +98,11 @@ export async function runFlowScan(
 ): Promise<FlowScanResult> {
 
     const browser = await chromium.launch();
-    const page    = await browser.newPage();
+    const context = await browser.newContext();
+    const page    = await context.newPage();
 
     try {
-        await page.goto(url, { waitUntil: "networkidle" });
+        await page.goto(url, { waitUntil: "load" });
 
         // Initialen DOM für Claude bereitstellen
         const pageHtml = await page.content();
