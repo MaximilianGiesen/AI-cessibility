@@ -118,13 +118,11 @@ export function ScanDialog({ onClose, onStart }: Props) {
 
                 {/* Optionen */}
                 <div style={{ marginBottom: 18, display: "flex", flexDirection: "column", gap: 8 }}>
-                    {mode === "flow" && (
-                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13,
-                            cursor: "pointer", color: "var(--color-text-secondary)" }}>
-                            <input type="checkbox" checked={screenshots} onChange={e => setScreenshots(e.target.checked)}/>
-                            Screenshots nach jedem Schritt speichern
-                        </label>
-                    )}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13,
+                        cursor: "pointer", color: "var(--color-text-secondary)" }}>
+                        <input type="checkbox" checked={screenshots} onChange={e => setScreenshots(e.target.checked)}/>
+                        {mode === "flow" ? "Screenshots nach jedem Schritt speichern" : "Screenshot mit markierten Verstößen speichern"}
+                    </label>
                     <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13,
                         cursor: "pointer", color: "var(--color-text-secondary)" }}>
                         <input type="checkbox" checked={autoJira} onChange={e => setAutoJira(e.target.checked)}/>

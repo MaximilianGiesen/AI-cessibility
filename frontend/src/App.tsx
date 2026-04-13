@@ -126,14 +126,15 @@ const ModeBadge = ({ mode }: { mode: string }) => {
 // ── ScanDialog ────────────────────────────────────────────────────────────────
 
 function ScanDialog({ onClose, onStart }: { onClose: () => void; onStart: (b: any) => Promise<void> }) {
-  const [url,       setUrl]       = useState("");
-  const [wcag,      setWcag]      = useState("AA");
-  const [mode,      setMode]      = useState("snapshot");
-  const [goal,      setGoal]      = useState("");
-  const [maxPages,  setMaxPages]  = useState(20);
-  const [autoJira,  setAutoJira]  = useState(false);
-  const [urlError,  setUrlError]  = useState("");
-  const [submitting,setSubmitting]= useState(false);
+  const [url,        setUrl]        = useState("");
+  const [wcag,       setWcag]       = useState("AA");
+  const [mode,       setMode]       = useState("snapshot");
+  const [goal,       setGoal]       = useState("");
+  const [maxPages,   setMaxPages]   = useState(20);
+  const [autoJira,   setAutoJira]   = useState(false);
+  const [screenshots,setScreenshots]= useState(false);
+  const [urlError,   setUrlError]   = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const isValidUrl = () => { try { new URL(url); return true; } catch { return false; } };
   const canSubmit  = isValidUrl() && (mode !== "flow" || goal.trim().length > 0) && !submitting;
@@ -142,7 +143,7 @@ function ScanDialog({ onClose, onStart }: { onClose: () => void; onStart: (b: an
     if (!isValidUrl()) { setUrlError("Gültige URL inkl. https:// eingeben"); return; }
     setSubmitting(true);
     try {
-      await onStart({ url, wcag_level: wcag, mode, flow_goal: goal || undefined, auto_jira: autoJira, max_pages: maxPages });
+      await onStart({ url, wcag_level: wcag, mode, flow_goal: goal || undefined, auto_jira: autoJira, screenshots, max_pages: maxPages });
     } catch (e: any) { setUrlError(e.message); setSubmitting(false); }
   };
 
@@ -226,6 +227,15 @@ function ScanDialog({ onClose, onStart }: { onClose: () => void; onStart: (b: an
                 className="w-full accent-blue-500"/>
             </div>
           )}
+
+          {/* Screenshots */}
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" checked={screenshots} onChange={e => setScreenshots(e.target.checked)}
+              className="w-4 h-4 accent-blue-500"/>
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              {mode === "flow" ? "Screenshots nach jedem Schritt speichern" : mode === "crawl" ? "Screenshots pro Seite speichern" : "Screenshot mit markierten Verstößen speichern"}
+            </span>
+          </label>
 
           {/* Auto Jira */}
           <label className="flex items-center gap-2.5 cursor-pointer">
@@ -382,6 +392,140 @@ function FindingCard({ finding, selected, onToggle }: { finding: any; selected: 
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── FlowProtocol ─────────────────────────────────────────────────────────────
+
+function FlowProtocol({ scan, findings }: { scan: any; findings: any[] }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const meta = scan.flow_meta;
+  if (!meta?.steps?.length) return null;
+
+  return (
+    <div className="mb-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Flow-Protokoll</p>
+        <p className="text-xs text-slate-400 mt-0.5">{meta.goal}</p>
+      </div>
+      <div className="divide-y divide-slate-100 dark:divide-slate-700">
+        {meta.steps.map((s: any) => {
+          const stepFindings = findings.filter((f: any) => f.flow_step === s.stepIndex);
+          const hasContent   = stepFindings.length > 0 || !!s.screenshotUrl;
+          const isOpen       = open === s.stepIndex;
+          return (
+            <div key={s.stepIndex}>
+              <div
+                onClick={() => hasContent && setOpen(isOpen ? null : s.stepIndex)}
+                className={`flex items-center gap-3 px-5 py-3 transition-colors ${hasContent ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" : ""}`}>
+                <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold
+                  ${s.status === "ok"
+                    ? "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400"
+                    : "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"}`}>
+                  {s.status === "ok" ? "✓" : "✕"}
+                </div>
+                <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{s.description}</span>
+                {s.findingCount > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400 font-medium">
+                    {s.findingCount}
+                  </span>
+                )}
+                {s.screenshotUrl && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-400">
+                    Screenshot
+                  </span>
+                )}
+                {hasContent && (
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                  </svg>
+                )}
+              </div>
+              {isOpen && (
+                <div className="px-5 pb-4 space-y-2 bg-slate-50 dark:bg-slate-900/30">
+                  {stepFindings.map((f: any) => (
+                    <div key={f.id} className="flex items-start gap-2 py-2">
+                      <div className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${SEV[f.severity]?.dot ?? "bg-slate-400"}`}/>
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{f.rule_id}</span>
+                        <p className="text-xs text-slate-400 mt-0.5">{f.fix_hint}</p>
+                      </div>
+                      <Badge sev={f.severity}/>
+                    </div>
+                  ))}
+                  {s.screenshotUrl && (
+                    <img
+                      src={`${BASE}${s.screenshotUrl}`}
+                      alt={`Screenshot: ${s.description}`}
+                      loading="lazy"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 mt-2"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── CrawlProtocol ─────────────────────────────────────────────────────────────
+
+function CrawlProtocol({ scan }: { scan: any }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const meta = scan.flow_meta;
+  if (!meta?.pages?.length) return null;
+
+  return (
+    <div className="mb-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Crawl-Protokoll</p>
+        <p className="text-xs text-slate-400 mt-0.5">{meta.pagesScanned} Seiten gescannt</p>
+      </div>
+      <div className="divide-y divide-slate-100 dark:divide-slate-700">
+        {meta.pages.map((p: any, i: number) => {
+          const hasContent = p.findingCount > 0 || !!p.screenshotUrl;
+          const isOpen     = open === i;
+          return (
+            <div key={i}>
+              <div
+                onClick={() => hasContent && setOpen(isOpen ? null : i)}
+                className={`flex items-center gap-3 px-5 py-3 transition-colors ${hasContent ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" : ""}`}>
+                <div className={`w-2 h-2 rounded-full shrink-0 ${p.status === "done" ? "bg-green-400" : "bg-red-400"}`}/>
+                <span className="flex-1 text-xs text-slate-600 dark:text-slate-400 truncate">{p.url}</span>
+                {p.findingCount > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400 font-medium">
+                    {p.findingCount}
+                  </span>
+                )}
+                {p.screenshotUrl && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-400">
+                    Screenshot
+                  </span>
+                )}
+                {hasContent && (
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                  </svg>
+                )}
+              </div>
+              {isOpen && p.screenshotUrl && (
+                <div className="px-5 pb-4 bg-slate-50 dark:bg-slate-900/30">
+                  <img
+                    src={`${BASE}${p.screenshotUrl}`}
+                    alt={`Screenshot: ${p.url}`}
+                    loading="lazy"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -610,6 +754,25 @@ export default function Dashboard() {
                 <div className="text-center py-20 text-slate-400 text-sm">Scan oben auswählen</div>
               ) : (
                 <>
+                  {/* Screenshot (Snapshot) */}
+                  {activeScan.mode === "snapshot" && activeScan.flow_meta?.screenshotUrl && (
+                    <div className="mb-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-5">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white mb-3">Screenshot mit markierten Verstößen</p>
+                      <img
+                        src={`${BASE}${activeScan.flow_meta.screenshotUrl}`}
+                        alt="Seiten-Screenshot mit markierten Accessibility-Verstößen"
+                        loading="lazy"
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700"
+                      />
+                    </div>
+                  )}
+
+                  {/* Flow-Protokoll */}
+                  {activeScan.mode === "flow" && <FlowProtocol scan={activeScan} findings={findings}/>}
+
+                  {/* Crawl-Protokoll */}
+                  {activeScan.mode === "crawl" && <CrawlProtocol scan={activeScan}/>}
+
                   {/* Severity Filter */}
                   <div className="flex gap-2 mb-4 flex-wrap">
                     {(["all","critical","serious","moderate","minor"] as const).map(f => (

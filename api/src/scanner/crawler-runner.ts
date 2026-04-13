@@ -2,6 +2,7 @@ import { chromium, type Page } from "playwright";
 import { AxeBuilder } from "@axe-core/playwright";
 import { randomUUID } from "crypto";
 import type { Finding } from "../types.js";
+import { takeAnnotatedScreenshot } from "./screenshot-helper.js";
 
 const WCAG_TAGS: Record<"A" | "AA" | "AAA", string[]> = {
     A:   ["wcag2a"],
@@ -10,9 +11,10 @@ const WCAG_TAGS: Record<"A" | "AA" | "AAA", string[]> = {
 };
 
 interface PageResult {
-    url:      string;
-    status:   "done" | "failed";
-    findings: Omit<Finding, "scanId">[];
+    url:            string;
+    status:         "done" | "failed";
+    findings:       Omit<Finding, "scanId">[];
+    screenshotUrl?: string;
 }
 
 export interface CrawlScanResult {
@@ -66,9 +68,11 @@ async function runAxeOnPage(page: Page, wcagLevel: "A" | "AA" | "AAA"): Promise<
 // ── Haupt-Export ──────────────────────────────────────────────────────────────
 
 export async function runCrawlScan(
-    startUrl:  string,
-    wcagLevel: "A" | "AA" | "AAA",
-    maxPages:  number,
+    startUrl:        string,
+    wcagLevel:       "A" | "AA" | "AAA",
+    maxPages:        number,
+    withScreenshots: boolean = false,
+    scanId:          string  = "",
 ): Promise<CrawlScanResult> {
     const origin  = new URL(startUrl).origin;
     const visited = new Set<string>();
@@ -91,7 +95,20 @@ export async function runCrawlScan(
                 await page.goto(url, { waitUntil: "load", timeout: 30000 });
 
                 const findings = await runAxeOnPage(page, wcagLevel);
-                pages.push({ url, status: "done", findings });
+
+                let screenshotUrl: string | undefined;
+                if (withScreenshots && scanId) {
+                    try {
+                        screenshotUrl = await takeAnnotatedScreenshot(
+                            page,
+                            findings.map(f => f.selector),
+                            scanId,
+                            `page_${pages.length}.jpg`,
+                        );
+                    } catch { /* Screenshot-Fehler ignorieren */ }
+                }
+
+                pages.push({ url, status: "done", findings, screenshotUrl });
 
                 // Neue Links einsammeln
                 const links = await collectLinks(page, origin);
@@ -100,7 +117,7 @@ export async function runCrawlScan(
                     if (!visited.has(path)) queue.push(fullUrl);
                 }
             } catch {
-                pages.push({ url, status: "failed", findings: [] });
+                pages.push({ url, status: "failed", findings: [], screenshotUrl: undefined });
             } finally {
                 await page.close();
             }

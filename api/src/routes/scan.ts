@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { createReadStream } from "fs";
+import { readFile } from "fs/promises";
 import { join } from "path";
 import { db } from "../db/client.js";
 import { runJiraAutomator } from "../jira/automator.js";
@@ -82,9 +82,12 @@ export async function scanRoutes(app: FastifyInstance) {
             return reply.status(400).send({ error: "Ungültiger Pfad" });
         }
         const filePath = join(SCREENSHOTS_BASE, scanId, filename);
-        const stream = createReadStream(filePath);
-        stream.on("error", () => reply.status(404).send({ error: "Screenshot nicht gefunden" }));
-        reply.type("image/jpeg").send(stream);
+        try {
+            const data = await readFile(filePath);
+            return reply.type("image/jpeg").send(data);
+        } catch {
+            return reply.status(404).send({ error: "Screenshot nicht gefunden" });
+        }
     });
 
     // GET /scans — Liste aller Scans
@@ -162,19 +165,24 @@ async function runScanInBackground(opts: {
             };
         } else if (mode === "crawl") {
             const { runCrawlScan } = await import("../scanner/crawler-runner.js");
-            const result = await runCrawlScan(url, wcag_level, max_pages);
+            const result = await runCrawlScan(url, wcag_level, max_pages, screenshots, scanId);
             findings = result.allFindings;
             flowMeta = {
                 pagesScanned: result.pages.length,
-                pages: result.pages.map((p: { url: string; status: string; findings: unknown[] }) => ({
-                    url:          p.url,
-                    status:       p.status,
-                    findingCount: p.findings.length,
+                pages: result.pages.map((p: { url: string; status: string; findings: unknown[]; screenshotUrl?: string }) => ({
+                    url:           p.url,
+                    status:        p.status,
+                    findingCount:  p.findings.length,
+                    screenshotUrl: p.screenshotUrl,
                 })),
             };
         } else {
             const { runAxe } = await import("../scanner/axe-runner.js");
-            findings = await runAxe(url, wcag_level);
+            const result = await runAxe(url, wcag_level, screenshots, scanId);
+            findings = result.findings;
+            if (result.screenshotUrl) {
+                flowMeta = { screenshotUrl: result.screenshotUrl };
+            }
         }
 
         if (findings.length > 0) {

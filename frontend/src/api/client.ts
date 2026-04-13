@@ -33,7 +33,7 @@ export interface Scan {
     id:          string;
     url:         string;
     wcag_level:  string;
-    mode:        "snapshot" | "flow";
+    mode:        "snapshot" | "flow" | "crawl";
     status:      "running" | "done" | "failed";
     total:       number;
     critical:    number;
@@ -41,16 +41,16 @@ export interface Scan {
     moderate:    number;
     minor:       number;
     flow_goal?:  string;
-    flow_meta?:  FlowMeta;
+    flow_meta?:  FlowMeta | SnapshotMeta | CrawlMeta | null;
     error?:      string;
     created_at:  string;
     finished_at?: string;
 }
 
 export interface FlowMeta {
-    goal:      string;
-    testData:  Record<string, string>;
-    steps:     FlowStepSummary[];
+    goal:     string;
+    testData: Record<string, string>;
+    steps:    FlowStepSummary[];
 }
 
 export interface FlowStepSummary {
@@ -60,6 +60,22 @@ export interface FlowStepSummary {
     status:        "ok" | "error";
     findingCount:  number;
     screenshotUrl?: string;
+}
+
+export interface SnapshotMeta {
+    screenshotUrl: string;
+}
+
+export interface CrawlPageSummary {
+    url:           string;
+    status:        "done" | "failed";
+    findingCount:  number;
+    screenshotUrl?: string;
+}
+
+export interface CrawlMeta {
+    pagesScanned: number;
+    pages:        CrawlPageSummary[];
 }
 
 export const scansApi = {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { Scan, Finding } from "../api/client";
+import type { Scan, Finding, FlowMeta, SnapshotMeta } from "../api/client";
 import { API_BASE } from "../api/client";
 
 interface Props {
@@ -34,8 +34,8 @@ function SevBadge({ sev }: { sev: keyof typeof SEV }) {
 
 function FlowProtocol({ scan, findings }: { scan: Scan; findings: Finding[] }) {
     const [open, setOpen] = useState<number | null>(null);
-    const meta = scan.flow_meta;
-    if (!meta) return null;
+    const meta = scan.flow_meta as FlowMeta | null;
+    if (!meta?.steps) return null;
 
     return (
         <div style={{ borderRadius: "var(--border-radius-lg)", border: "1px solid var(--color-border-tertiary)",
@@ -272,6 +272,26 @@ export function FindingsPanel({ scans, activeScan, findings, loading, exporting,
                     {/* Flow-Protokoll (nur bei Flow-Scans) */}
                     {activeScan.mode === "flow" && activeScan.flow_meta && (
                         <FlowProtocol scan={activeScan} findings={findings} />
+                    )}
+
+                    {/* Screenshot (Snapshot-Scan) */}
+                    {activeScan.mode === "snapshot" && (activeScan.flow_meta as SnapshotMeta)?.screenshotUrl && (
+                        <div style={{ borderRadius: "var(--border-radius-lg)",
+                            border: "1px solid var(--color-border-tertiary)",
+                            background: "var(--color-background-secondary)",
+                            padding: 16, marginBottom: 16 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
+                                Screenshot mit markierten Verstößen
+                            </div>
+                            <img
+                                src={`${API_BASE}${(activeScan.flow_meta as SnapshotMeta).screenshotUrl}`}
+                                alt="Seiten-Screenshot mit markierten Accessibility-Verstößen"
+                                loading="lazy"
+                                style={{ width: "100%", display: "block",
+                                    borderRadius: 6,
+                                    border: "1px solid var(--color-border-tertiary)" }}
+                            />
+                        </div>
                     )}
 
                     {/* Severity-Filter */}
