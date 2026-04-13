@@ -135,8 +135,8 @@ const ModeBadge = ({ mode }: { mode: string }) => {
 
 // ── ScanDialog ────────────────────────────────────────────────────────────────
 
-function ScanDialog({ onClose, onStart }: { onClose: () => void; onStart: (b: any) => Promise<void> }) {
-  const [url,        setUrl]        = useState("");
+function ScanDialog({ onClose, onStart, defaultUrl = "" }: { onClose: () => void; onStart: (b: any) => Promise<void>; defaultUrl?: string }) {
+  const [url,        setUrl]        = useState(defaultUrl);
   const [wcag,       setWcag]       = useState("AA");
   const [mode,       setMode]       = useState("snapshot");
   const [goal,       setGoal]       = useState("");
@@ -550,6 +550,7 @@ export default function Dashboard() {
   const [sevFilter,   setSevFilter]   = useState("all");
   const [selected,    setSelected]    = useState(new Set<string>());
   const [showDialog,      setShowDialog]      = useState(false);
+  const [lastUrl,         setLastUrl]         = useState("");
   const [flowScanId,      setFlowScanId]      = useState<string | null>(null);
   const [exporting,       setExporting]       = useState(false);
   const [apiError,        setApiError]        = useState<string | null>(null);
@@ -577,6 +578,7 @@ export default function Dashboard() {
   const handleStart = useCallback(async (body: any) => {
     setShowDialog(false);
     setApiError(null);
+    if (body.url) setLastUrl(body.url);
     try {
       const scanId = await startScan(body);
       poll(scanId);
@@ -872,7 +874,7 @@ export default function Dashboard() {
       </main>
 
       {/* Dialog */}
-      {showDialog && <ScanDialog onClose={() => setShowDialog(false)} onStart={handleStart}/>}
+      {showDialog && <ScanDialog onClose={() => setShowDialog(false)} onStart={handleStart} defaultUrl={lastUrl}/>}
     </div>
   );
 }
