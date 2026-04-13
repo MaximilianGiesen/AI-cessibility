@@ -1,17 +1,19 @@
 import { chromium, type Page } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 import { planFlow } from "./flow-planner.js";
+import { takeAnnotatedScreenshot } from "./screenshot-helper.js";
 import type { Finding } from "../types.js";
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
 export interface StepResult {
-    stepIndex:    number;
-    description:  string;
-    action:       string;
-    status:       "ok" | "error";
-    error?:       string;
-    findings:     Finding[];
+    stepIndex:     number;
+    description:   string;
+    action:        string;
+    status:        "ok" | "error";
+    error?:        string;
+    findings:      Finding[];
+    screenshotUrl?: string;
 }
 
 export interface FlowScanResult {
@@ -95,6 +97,7 @@ export async function runFlowScan(
     goal:            string,
     wcagLevel:       "A" | "AA" | "AAA" = "AA",
     withScreenshots: boolean             = false,
+    scanId:          string              = "",
 ): Promise<FlowScanResult> {
 
     const browser = await chromium.launch();
@@ -115,12 +118,26 @@ export async function runFlowScan(
 
         // Schritt 0: Initiale Prüfung vor jeder Interaktion
         const initialFindings = await runAxeOnStep(page, 0, "Initialer Seitenaufruf", wcagLevel);
+
+        let initialScreenshot: string | undefined;
+        if (withScreenshots && scanId) {
+            try {
+                initialScreenshot = await takeAnnotatedScreenshot(
+                    page,
+                    initialFindings.map(f => f.selector),
+                    scanId,
+                    "step_0.jpg",
+                );
+            } catch { /* Screenshot-Fehler ignorieren */ }
+        }
+
         stepResults.push({
-            stepIndex:   0,
-            description: "Initialer Seitenaufruf",
-            action:      "navigate",
-            status:      "ok",
-            findings:    initialFindings,
+            stepIndex:     0,
+            description:   "Initialer Seitenaufruf",
+            action:        "navigate",
+            status:        "ok",
+            findings:      initialFindings,
+            screenshotUrl: initialScreenshot,
         });
         initialFindings.forEach(f => seenFindings.add(`${f.ruleId}::${f.selector}`));
 
@@ -141,6 +158,19 @@ export async function runFlowScan(
             // axe nach diesem Schritt
             const stepFindings = await runAxeOnStep(page, i + 1, step.description, wcagLevel);
 
+            // Screenshot vor Dedup — zeigt alle aktuell sichtbaren Verstöße
+            let screenshotUrl: string | undefined;
+            if (withScreenshots && scanId) {
+                try {
+                    screenshotUrl = await takeAnnotatedScreenshot(
+                        page,
+                        stepFindings.map(f => f.selector),
+                        scanId,
+                        `step_${i + 1}.jpg`,
+                    );
+                } catch { /* Screenshot-Fehler ignorieren */ }
+            }
+
             // Nur neue Findings aufnehmen
             const newFindings = stepFindings.filter(f => {
                 const key = `${f.ruleId}::${f.selector}`;
@@ -150,12 +180,13 @@ export async function runFlowScan(
             });
 
             stepResults.push({
-                stepIndex:   i + 1,
-                description: step.description,
-                action:      step.action,
+                stepIndex:    i + 1,
+                description:  step.description,
+                action:       step.action,
                 status,
                 error,
-                findings:    newFindings,
+                findings:     newFindings,
+                screenshotUrl,
             });
         }
 

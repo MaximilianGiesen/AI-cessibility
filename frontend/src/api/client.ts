@@ -2,7 +2,8 @@
 // BASE_URL kommt aus der Umgebungsvariable, sodass dev/staging/prod
 // unterschiedliche Backends nutzen können.
 
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const BASE = API_BASE;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
@@ -53,11 +54,12 @@ export interface FlowMeta {
 }
 
 export interface FlowStepSummary {
-    stepIndex:    number;
-    description:  string;
-    action:       string;
-    status:       "ok" | "error";
-    findingCount: number;
+    stepIndex:     number;
+    description:   string;
+    action:        string;
+    status:        "ok" | "error";
+    findingCount:  number;
+    screenshotUrl?: string;
 }
 
 export const scansApi = {

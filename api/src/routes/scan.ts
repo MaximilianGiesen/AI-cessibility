@@ -1,8 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { createReadStream } from "fs";
+import { join } from "path";
 import { db } from "../db/client.js";
 import { runJiraAutomator } from "../jira/automator.js";
+import { SCREENSHOTS_BASE } from "../scanner/screenshot-helper.js";
 
 const ScanBody = z.object({
     url:          z.string().url(),
@@ -71,6 +74,19 @@ export async function scanRoutes(app: FastifyInstance) {
         });
     });
 
+    // GET /screenshots/:scanId/:filename — Screenshot ausliefern
+    app.get("/screenshots/:scanId/:filename", async (req, reply) => {
+        const { scanId, filename } = req.params as { scanId: string; filename: string };
+        // Pfad-Traversal verhindern: nur UUID-Format und sichere Dateinamen erlauben
+        if (!/^[\da-f-]{36}$/.test(scanId) || !/^[\w.]+$/.test(filename)) {
+            return reply.status(400).send({ error: "Ungültiger Pfad" });
+        }
+        const filePath = join(SCREENSHOTS_BASE, scanId, filename);
+        const stream = createReadStream(filePath);
+        stream.on("error", () => reply.status(404).send({ error: "Screenshot nicht gefunden" }));
+        reply.type("image/jpeg").send(stream);
+    });
+
     // GET /scans — Liste aller Scans
     app.get("/scans", async (_req, reply) => {
         const scans = await db
@@ -130,16 +146,18 @@ async function runScanInBackground(opts: {
                 flow_goal ?? "Prüfe die wichtigsten User-Flows auf Accessibility",
                 wcag_level,
                 screenshots,
+                scanId,
             );
             findings = result.allFindings;
             flowMeta = {
                 goal:     result.goal,
                 testData: result.testData,
                 steps:    result.steps.map(s => ({
-                    stepIndex:    s.stepIndex,
-                    description:  s.description,
-                    status:       s.status,
-                    findingCount: s.findings.length,
+                    stepIndex:     s.stepIndex,
+                    description:   s.description,
+                    status:        s.status,
+                    findingCount:  s.findings.length,
+                    screenshotUrl: s.screenshotUrl,
                 })),
             };
         } else if (mode === "crawl") {

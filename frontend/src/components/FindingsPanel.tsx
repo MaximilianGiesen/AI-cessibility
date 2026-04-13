@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import type { Scan, Finding } from "../api/client";
+import { API_BASE } from "../api/client";
 
 interface Props {
     scans:        Scan[];
@@ -46,15 +47,16 @@ function FlowProtocol({ scan, findings }: { scan: Scan; findings: Finding[] }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {meta.steps.map(s => {
                     const stepFindings = findings.filter(f => f.flow_step === s.stepIndex);
-                    const isOpen = open === s.stepIndex;
+                    const hasContent   = stepFindings.length > 0 || !!s.screenshotUrl;
+                    const isOpen       = open === s.stepIndex;
                     return (
                         <div key={s.stepIndex}>
                             <div
-                                onClick={() => stepFindings.length && setOpen(isOpen ? null : s.stepIndex)}
+                                onClick={() => hasContent && setOpen(isOpen ? null : s.stepIndex)}
                                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
                                     borderRadius: 8, background: "var(--color-background-primary)",
                                     border: "0.5px solid var(--color-border-tertiary)",
-                                    cursor: stepFindings.length ? "pointer" : "default" }}>
+                                    cursor: hasContent ? "pointer" : "default" }}>
                                 <div style={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
                                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9,
                                     background: s.status === "ok" ? "var(--color-background-success)" : "var(--color-background-danger)",
@@ -68,26 +70,50 @@ function FlowProtocol({ scan, findings }: { scan: Scan; findings: Finding[] }) {
                     {s.findingCount}
                   </span>
                                 )}
-                                {stepFindings.length > 0 && (
+                                {s.screenshotUrl && (
+                                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 99,
+                                        background: "var(--color-background-secondary)",
+                                        color: "var(--color-text-tertiary)",
+                                        border: "0.5px solid var(--color-border-tertiary)" }}>
+                    Screenshot
+                  </span>
+                                )}
+                                {hasContent && (
                                     <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
                     {isOpen ? "▲" : "▼"}
                   </span>
                                 )}
                             </div>
-                            {isOpen && stepFindings.map(f => (
-                                <div key={f.id} style={{ marginTop: 4, marginLeft: 24, padding: "8px 12px",
-                                    borderRadius: 6, border: "0.5px solid var(--color-border-tertiary)",
-                                    background: "var(--color-background-secondary)", fontSize: 12 }}>
-                                    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
-                                        <SevBadge sev={f.severity as keyof typeof SEV} />
-                                        <span style={{ fontWeight: 500 }}>{f.rule_id}</span>
-                                        <span style={{ color: "var(--color-text-tertiary)", fontSize: 11 }}>
-                      WCAG {f.wcag_tags[0]?.replace("wcag","")?.split("").join(".")}
-                    </span>
-                                    </div>
-                                    <div style={{ color: "var(--color-text-secondary)" }}>{f.fix_hint}</div>
+                            {isOpen && (
+                                <div>
+                                    {stepFindings.map(f => (
+                                        <div key={f.id} style={{ marginTop: 4, marginLeft: 24, padding: "8px 12px",
+                                            borderRadius: 6, border: "0.5px solid var(--color-border-tertiary)",
+                                            background: "var(--color-background-secondary)", fontSize: 12 }}>
+                                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                                                <SevBadge sev={f.severity as keyof typeof SEV} />
+                                                <span style={{ fontWeight: 500 }}>{f.rule_id}</span>
+                                                <span style={{ color: "var(--color-text-tertiary)", fontSize: 11 }}>
+                          WCAG {f.wcag_tags[0]?.replace("wcag","")?.split("").join(".")}
+                        </span>
+                                            </div>
+                                            <div style={{ color: "var(--color-text-secondary)" }}>{f.fix_hint}</div>
+                                        </div>
+                                    ))}
+                                    {s.screenshotUrl && (
+                                        <div style={{ marginTop: 6, marginLeft: 24 }}>
+                                            <img
+                                                src={`${API_BASE}${s.screenshotUrl}`}
+                                                alt={`Screenshot: ${s.description}`}
+                                                loading="lazy"
+                                                style={{ width: "100%", display: "block",
+                                                    borderRadius: 6,
+                                                    border: "1px solid var(--color-border-tertiary)" }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                            )}
                         </div>
                     );
                 })}
