@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { readFile } from "fs/promises";
+import { readFile, rm } from "fs/promises";
 import { join } from "path";
 import { db } from "../db/client.js";
 import { runJiraAutomator } from "../jira/automator.js";
@@ -72,6 +72,42 @@ export async function scanRoutes(app: FastifyInstance) {
             flow_meta: scan.flow_meta ? JSON.parse(scan.flow_meta as string) : null,
             findings,
         });
+    });
+
+    // DELETE /scans/:id — Scan + Findings + Screenshots löschen
+    app.delete("/scans/:id", async (req, reply) => {
+        const { id } = req.params as { id: string };
+
+        const scan = await db
+            .selectFrom("scans").select("id")
+            .where("id", "=", id)
+            .executeTakeFirst();
+
+        if (!scan) return reply.status(404).send({ error: "Scan nicht gefunden" });
+
+        // Jira-Tickets für Findings dieses Scans löschen
+        const findingIds = (await db
+            .selectFrom("findings").select("id")
+            .where("scan_id", "=", id)
+            .execute()
+        ).map(f => f.id);
+
+        if (findingIds.length > 0) {
+            await db.deleteFrom("jira_tickets")
+                .where("finding_id", "in", findingIds)
+                .execute();
+        }
+
+        // Findings löschen
+        await db.deleteFrom("findings").where("scan_id", "=", id).execute();
+
+        // Scan löschen
+        await db.deleteFrom("scans").where("id", "=", id).execute();
+
+        // Screenshot-Verzeichnis entfernen (best-effort)
+        rm(join(SCREENSHOTS_BASE, id), { recursive: true, force: true }).catch(() => {});
+
+        return reply.send({ ok: true });
     });
 
     // GET /screenshots/:scanId/:filename — Screenshot ausliefern

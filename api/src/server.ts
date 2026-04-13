@@ -9,6 +9,8 @@ await app.register(cors, {
     origin: process.env.CORS_ORIGIN
         ? process.env.CORS_ORIGIN.split(",")
         : ["http://localhost:5173", "http://localhost:5174"],
+    methods:        ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
 });
 await app.register(scanRoutes);
 await app.register(jiraRoutes);

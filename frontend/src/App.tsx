@@ -6,17 +6,22 @@ const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 async function api(path: string, init?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      ...(init?.body != null ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
     ...init,
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 const scansApi = {
-  list:  ()           => api("/scans"),
-  get:   (id: string) => api(`/scans/${id}`),
-  start: (body: any)  => api("/scans", { method: "POST", body: JSON.stringify(body) }),
+  list:   ()           => api("/scans"),
+  get:    (id: string) => api(`/scans/${id}`),
+  start:  (body: any)  => api("/scans", { method: "POST", body: JSON.stringify(body) }),
+  delete: (id: string) => api(`/scans/${id}`, { method: "DELETE" }),
 };
 
 const jiraApi = {
@@ -57,7 +62,12 @@ function useScans() {
     setScans(prev => prev.map(s => s.id === updated.id ? { ...s, ...updated } : s));
   }, []);
 
-  return { scans, loading, error, startScan, updateScan };
+  const deleteScan = useCallback(async (id: string) => {
+    await scansApi.delete(id);
+    setScans(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  return { scans, loading, error, startScan, updateScan, deleteScan };
 }
 
 function useScanPoller(onUpdate: (s: any) => void) {
@@ -539,12 +549,14 @@ export default function Dashboard() {
   const [findLoading, setFindLoading] = useState(false);
   const [sevFilter,   setSevFilter]   = useState("all");
   const [selected,    setSelected]    = useState(new Set<string>());
-  const [showDialog,  setShowDialog]  = useState(false);
-  const [flowScanId,  setFlowScanId]  = useState<string | null>(null);
-  const [exporting,   setExporting]   = useState(false);
-  const [apiError,    setApiError]    = useState<string | null>(null);
+  const [showDialog,      setShowDialog]      = useState(false);
+  const [flowScanId,      setFlowScanId]      = useState<string | null>(null);
+  const [exporting,       setExporting]       = useState(false);
+  const [apiError,        setApiError]        = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting,        setDeleting]        = useState(false);
 
-  const { scans, loading, error: scanError, startScan, updateScan } = useScans();
+  const { scans, loading, error: scanError, startScan, updateScan, deleteScan } = useScans();
 
   const handleUpdate = useCallback((updated: any) => {
     updateScan(updated);
@@ -571,6 +583,16 @@ export default function Dashboard() {
       if (body.mode === "flow") setFlowScanId(scanId);
     } catch (e: any) { setApiError(e.message); }
   }, [startScan, poll]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    setDeleting(true);
+    try {
+      await deleteScan(id);
+      if (activeScan?.id === id) { setActiveScan(null); setFindings([]); }
+      setConfirmDeleteId(null);
+    } catch (e: any) { console.error("handleDelete failed:", e); setApiError(e.message); }
+    finally { setDeleting(false); }
+  }, [deleteScan, activeScan]);
 
   const filtered  = sevFilter === "all" ? findings : findings.filter(f => f.severity === sevFilter);
   const toggle    = (id: string) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -694,42 +716,74 @@ export default function Dashboard() {
                   <p className="text-slate-400 text-xs mt-1">Klicke auf „Scan starten" um loszulegen.</p>
                 </div>
               )}
-              {scans.map(s => (
-                <div key={s.id}
-                  onClick={() => { if (s.status === "done") { setActiveScan(s); setView("findings"); } }}
-                  className={`p-4 rounded-xl border bg-white dark:bg-slate-800/50 transition-all ${s.status === "done" ? "border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 cursor-pointer hover:shadow-sm" : "border-slate-200 dark:border-slate-700 opacity-60"}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{s.url}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-400">{new Date(s.created_at).toLocaleString("de-DE")}</span>
-                        <ModeBadge mode={s.mode}/>
-                        {s.wcag_level && <span className="text-xs text-slate-400">WCAG {s.wcag_level}</span>}
+              {scans.map(s => {
+                const isConfirming = confirmDeleteId === s.id;
+                return (
+                  <div key={s.id}
+                    onClick={() => { if (s.status === "done" && !isConfirming) { setActiveScan(s); setView("findings"); } }}
+                    className={`p-4 rounded-xl border bg-white dark:bg-slate-800/50 transition-all ${s.status === "done" && !isConfirming ? "border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 cursor-pointer hover:shadow-sm" : "border-slate-200 dark:border-slate-700"} ${s.status !== "done" && !isConfirming ? "opacity-60" : ""}`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{s.url}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-400">{new Date(s.created_at).toLocaleString("de-DE")}</span>
+                          <ModeBadge mode={s.mode}/>
+                          {s.wcag_level && <span className="text-xs text-slate-400">WCAG {s.wcag_level}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {s.status === "running" && !isConfirming && (
+                          <span className="flex items-center gap-1.5 text-xs text-blue-500 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>Läuft…
+                          </span>
+                        )}
+                        {s.status === "failed" && !isConfirming && (
+                          <span className="text-xs text-red-500 font-medium">Fehlgeschlagen</span>
+                        )}
+                        {s.status === "done" && !isConfirming && (
+                          (["critical","serious","moderate","minor"] as const).map(sev =>
+                            s[sev] > 0 && <Badge key={sev} sev={sev}/>
+                          )
+                        )}
+
+                        {/* Löschen-Bereich */}
+                        {isConfirming ? (
+                          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">Scan löschen?</span>
+                            <button
+                              onClick={() => handleDelete(s.id)}
+                              disabled={deleting}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50">
+                              {deleting ? "…" : "Löschen"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                              Abbrechen
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(s.id); }}
+                            className="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            title="Scan löschen">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      {s.status === "running" ? (
-                        <span className="flex items-center gap-1.5 text-xs text-blue-500 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>Läuft…
-                        </span>
-                      ) : s.status === "failed" ? (
-                        <span className="text-xs text-red-500 font-medium">Fehlgeschlagen</span>
-                      ) : (
-                        (["critical","serious","moderate","minor"] as const).map(sev =>
-                          s[sev] > 0 && <Badge key={sev} sev={sev}/>
-                        )
-                      )}
-                    </div>
+                    {s.status === "done" && (
+                      <>
+                        <SevBar scan={s}/>
+                        <p className="text-xs text-slate-400 mt-2">{s.total} Findings gesamt</p>
+                      </>
+                    )}
+                    {s.status === "failed" && <p className="text-xs text-red-400 mt-2 truncate">{s.error ?? "Fehler"}</p>}
                   </div>
-                  {s.status === "done" && (
-                    <>
-                      <SevBar scan={s}/>
-                      <p className="text-xs text-slate-400 mt-2">{s.total} Findings gesamt</p>
-                    </>
-                  )}
-                  {s.status === "failed" && <p className="text-xs text-red-400 mt-2 truncate">{s.error ?? "Fehler"}</p>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
