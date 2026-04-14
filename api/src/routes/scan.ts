@@ -159,7 +159,7 @@ export async function scanRoutes(app: FastifyInstance) {
     });
 }
 
-// ── Hintergrundlogik ──────────────────────────────────────────────────────────
+// Hintergrundlogik
 
 async function runScanInBackground(opts: {
     scanId:      string;

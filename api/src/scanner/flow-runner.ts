@@ -4,7 +4,7 @@ import { planFlow } from "./flow-planner.js";
 import { takeAnnotatedScreenshot } from "./screenshot-helper.js";
 import type { Finding } from "../types.js";
 
-// ── Typen ─────────────────────────────────────────────────────────────────────
+// Typen
 
 export interface StepResult {
     stepIndex:     number;
@@ -23,8 +23,7 @@ export interface FlowScanResult {
     allFindings: Finding[];   // dedupliziert über alle Schritte
 }
 
-// ── Einen Schritt ausführen ───────────────────────────────────────────────────
-
+// Einen Schritt ausführen
 async function executeStep(page: Page, step: {
     action:   string;
     selector?: string;
@@ -53,7 +52,7 @@ async function executeStep(page: Page, step: {
     await page.waitForTimeout(400);
 }
 
-// ── axe nach einem Schritt ausführen ─────────────────────────────────────────
+// axe nach einem Schritt ausführen
 
 async function runAxeOnStep(
     page:        Page,
@@ -90,7 +89,7 @@ async function runAxeOnStep(
     );
 }
 
-// ── Haupt-Flow-Runner ─────────────────────────────────────────────────────────
+// Haupt-Flow-Runner
 
 export async function runFlowScan(
     url:             string,
