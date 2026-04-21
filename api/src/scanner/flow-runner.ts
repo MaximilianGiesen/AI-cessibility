@@ -1,4 +1,5 @@
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
+import { launchBrowser, newStealthContext } from "./browser.js";
 import AxeBuilder from "@axe-core/playwright";
 import { planFlow } from "./flow-planner.js";
 import { takeAnnotatedScreenshot } from "./screenshot-helper.js";
@@ -42,7 +43,7 @@ async function executeStep(page: Page, step: {
             await page.locator(step.selector!).first().selectOption(step.value ?? "");
             break;
         case "navigate":
-            await page.goto(step.url!, { waitUntil: "load" });
+            await page.goto(step.url!, { waitUntil: "domcontentloaded", timeout: 60000 });
             break;
         case "wait":
             await page.waitForTimeout(step.waitMs ?? 1000);
@@ -99,12 +100,12 @@ export async function runFlowScan(
     scanId:          string              = "",
 ): Promise<FlowScanResult> {
 
-    const browser = await chromium.launch();
-    const context = await browser.newContext();
+    const browser = await launchBrowser();
+    const context = await newStealthContext(browser);
     const page    = await context.newPage();
 
     try {
-        await page.goto(url, { waitUntil: "load" });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
         // Initialen DOM für Claude bereitstellen
         const pageHtml = await page.content();

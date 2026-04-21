@@ -1,4 +1,5 @@
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
+import { launchBrowser, newStealthContext } from "./browser.js";
 import { AxeBuilder } from "@axe-core/playwright";
 import { randomUUID } from "crypto";
 import type { Finding } from "../types.js";
@@ -79,8 +80,8 @@ export async function runCrawlScan(
     const queue   = [startUrl];
     const pages:  PageResult[] = [];
 
-    const browser = await chromium.launch();
-    const context = await browser.newContext();
+    const browser = await launchBrowser();
+    const context = await newStealthContext(browser);
 
     try {
         while (queue.length > 0 && pages.length < maxPages) {
@@ -92,7 +93,7 @@ export async function runCrawlScan(
 
             const page = await context.newPage();
             try {
-                await page.goto(url, { waitUntil: "load", timeout: 30000 });
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
                 const findings = await runAxeOnPage(page, wcagLevel);
 

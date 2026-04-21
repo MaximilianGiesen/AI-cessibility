@@ -1,8 +1,8 @@
-import { chromium } from "playwright";
 import { AxeBuilder } from "@axe-core/playwright";
 import { randomUUID } from "crypto";
 import type { Finding } from "../types.js";
 import { takeAnnotatedScreenshot } from "./screenshot-helper.js";
+import { launchBrowser, newStealthContext } from "./browser.js";
 
 const WCAG_TAGS: Record<"A" | "AA" | "AAA", string[]> = {
     A:   ["wcag2a"],
@@ -21,11 +21,11 @@ export async function runAxe(
     withScreenshots: boolean = false,
     scanId:          string  = "",
 ): Promise<AxeScanResult> {
-    const browser = await chromium.launch();
+    const browser = await launchBrowser();
     try {
-        const context = await browser.newContext();
+        const context = await newStealthContext(browser);
         const page = await context.newPage();
-        await page.goto(url, { waitUntil: "load" });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
         const results = await new AxeBuilder({ page })
             .withTags(WCAG_TAGS[wcagLevel])
