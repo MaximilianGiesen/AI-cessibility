@@ -30,7 +30,7 @@ export async function planFlow(
 
     const msg = await anthropic.messages.create({
         model:      "claude-opus-4-6",
-        max_tokens: 1000,
+        max_tokens: 4096,
         messages: [{
             role:    "user",
             content: `Du bist ein Accessibility-Test-Planer.
