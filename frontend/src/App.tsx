@@ -26,7 +26,7 @@ const scansApi = {
 
 const jiraApi = {
   export: (ids: string[], key?: string) =>
-    api("/jira/export", { method: "POST", body: JSON.stringify({ finding_ids: ids, project_key: key ?? "ACC" }) }),
+    api("/jira/export", { method: "POST", body: JSON.stringify({ finding_ids: ids, project_key: key ?? "AC" }) }),
 };
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
@@ -608,6 +608,9 @@ export default function Dashboard() {
       result.created.forEach(({ findingId, jiraKey }: any) => {
         setFindings(fs => fs.map(f => f.id === findingId ? { ...f, jira_key: jiraKey } : f));
       });
+      if (result.failed?.length > 0) {
+        setApiError(`Jira-Fehler: ${result.failed.map((f: any) => f.error).join(" | ")}`);
+      }
       setSelected(new Set());
     } catch (e: any) { setApiError(e.message); }
     finally { setExporting(false); }

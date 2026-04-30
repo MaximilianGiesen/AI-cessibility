@@ -122,7 +122,7 @@ export interface ExportResult {
 }
 
 export const jiraApi = {
-    export: (findingIds: string[], projectKey = "ACC") =>
+    export: (findingIds: string[], projectKey = "AC") =>
         request<ExportResult>("/jira/export", {
             method: "POST",
             body: JSON.stringify({ finding_ids: findingIds, project_key: projectKey }),

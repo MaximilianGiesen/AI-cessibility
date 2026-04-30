@@ -76,7 +76,7 @@ Regeln:
 
     let plan: FlowPlan;
     try {
-        // Markdown-Backticks entfernen falls Claude sie trotzdem schickt
+        // Markdown-Backticks entfernen
         const clean = text.replace(/```json|```/g, "").trim();
         plan = JSON.parse(clean);
     } catch {

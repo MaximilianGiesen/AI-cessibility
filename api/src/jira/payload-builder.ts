@@ -98,7 +98,7 @@ export function buildIssuePayload(
     return {
         fields: {
             project:     { key: projectKey },
-            issuetype:   { name: "Bug" },
+            issuetype:   { name: process.env.JIRA_ISSUE_TYPE ?? "Bug" },
             priority:    { name: PRIORITY[f.severity] },
             summary,
             description: { type: "doc", version: 1, content: descriptionContent },

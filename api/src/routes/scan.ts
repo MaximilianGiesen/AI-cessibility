@@ -10,7 +10,7 @@ import { SCREENSHOTS_BASE } from "../scanner/screenshot-helper.js";
 const ScanBody = z.object({
     url:          z.string().url(),
     wcag_level:   z.enum(["A", "AA", "AAA"]).default("AA"),
-    project_key:  z.string().default("ACC"),
+    project_key:  z.string().default("AC"),
     auto_jira:    z.boolean().default(false),
     mode:         z.enum(["snapshot", "flow", "crawl"]).default("snapshot"),
     flow_goal:    z.string().optional(),

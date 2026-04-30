@@ -5,7 +5,7 @@ import { runJiraAutomator } from "../jira/automator.js";
 
 const ExportBody = z.object({
     finding_ids: z.array(z.string().uuid()).min(1).max(100),
-    project_key: z.string().default("ACC"),
+    project_key: z.string().default("AC"),
 });
 
 export async function jiraRoutes(app: FastifyInstance) {
